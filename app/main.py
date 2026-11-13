@@ -1,5 +1,4 @@
 from datetime import datetime
-from email.mime import application
 from typing import List
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException
@@ -8,12 +7,11 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from telegram.ext import CommandHandler
 
 from app.database import get_db, AsyncSessionLocal, engine, Base
 from app import models, schemas
 from app.tracker import fetch_product_price
-from app.telegram import check_command, send_telegram_alert
+from app.telegram import send_telegram_alert
 
 def should_send_alert(product: models.Product, new_price: float) -> bool:
     if not product.target_price or new_price > product.target_price:
@@ -169,31 +167,3 @@ async def get_product_history(product_id: int, db: AsyncSession = Depends(get_db
         .order_by(models.PriceHistory.timestamp.desc())
     )
     return result.scalars().all()
-
-from app.scraper import check_product_price
-# დავუშვათ გვაქვს SQLAlchemy სესია და Product მოდელი
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-
-router = APIRouter()
-
-
-@router.post("/check-prices/")
-async def trigger_price_check(db: AsyncSession = Depends(get_db)):
-  products = await db.execute(select(models.Product))
-  products = products.scalars().all()
-
-  updates = []
-  for product in products:
-    # ვამოწმებთ მხოლოდ იმ პროდუქტებს, რომლებსაც რეალური ლინკი აქვთ (არ არის example.com)
-    if "example.com" not in product.url:
-      new_price = await check_product_price(product.url)
-      if new_price is not None:
-        product.price = new_price
-        # აქ შეგიძლია შეამოწმო: თუ new_price <= product.target_price,
-        # მზადდება შეტყობინება ტელეგრამისთის!
-        updates.append({"id": product.id, "title": product.title, "price": new_price})
-
-  await db.commit()
-  return {"status": "success", "updated_count": len(updates), "updates": updates}
-application.add_handler(CommandHandler("check", check_command))
