@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Async Price Tracker</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { background-color: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; }
+        button:hover { background-color: #2980b9; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
+        th { background-color: #f8f9fa; }
+        .actions button { background-color: #e74c3c; padding: 5px 10px; font-size: 14px; width: auto; margin-right: 5px; }
+        .actions button.check { background-color: #2ecc71; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 ფასების მთვალთვალელი (Price Tracker)</h1>
+        
+        <div class="form-group">
+            <label for="title">პროდუქტის დასახელება:</label>
+            <input type="text" id="title" placeholder="მაგ: ლეპტოპი">
+        </div>
+        <div class="form-group">
+            <label for="url">პროდუქტის ლინკი (URL):</label>
+            <input type="text" id="url" placeholder="https://example.com/item">
+        </div>
+        <div class="form-group">
+            <label for="target_price">სასურველი ფასი (ლარი):</label>
+            <input type="number" id="target_price" placeholder="1000">
+        </div>
+        <button onclick="addProduct()">პროდუქტის დამატება</button>
+
+        <h2>დამატებული პროდუქტები</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>დასახელება</th>
+                    <th>მიმდინარე ფასი</th>
+                    <th>სასურველი ფასი</th>
+                    <th>მოქმედება</th>
+                </tr>
+            </thead>
+            <tbody id="product-list">
+                <!-- ჯავასკრიპტი შეავსებს -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function fetchProducts() {
+            const response = await fetch('/products/');
+            const products = await response.json();
+            const list = document.getElementById('product-list');
+            list.innerHTML = '';
+            products.forEach(p => {
+                list.innerHTML += `
+                    <tr>
+                        <td><a href="${p.url}" target="_blank">${p.title}</a></td>
+                        <td>${p.current_price !== null ? p.current_price + ' ₾' : 'არ არის შემოწმებული'}</td>
+                        <td>${p.target_price} ₾</td>
+                        <td class="actions">
+                            <button class="check" onclick="checkProduct(${p.id})">შემოწმება</button>
+                            <button onclick="deleteProduct(${p.id})">წაშლა</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function addProduct() {
+            const title = document.getElementById('title').value;
+            const url = document.getElementById('url').value;
+            const target_price = parseFloat(document.getElementById('target_price').value) || 0;
+
+            if (!title || !url) {
+                alert('გთხოვთ შეავსოთ დასახელება და ლინკი!');
+                return;
+            }
+
+            const response = await fetch('/products/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, url, target_price })
+            });
+
+            if (response.ok) {
+                document.getElementById('title').value = '';
+                document.getElementById('url').value = '';
+                document.getElementById('target_price').value = '';
+                fetchProducts();
+            } else {
+                alert('შეცდომა პროდუქტის დამატებისას!');
+            }
+        }
+
+        async function deleteProduct(id) {
+            await fetch(`/products/${id}`, { method: 'DELETE' });
+            fetchProducts();
+        }
+
+        async function checkProduct(id) {
+            alert('მიმდინარეობს ფასის შემოწმება...');
+            await fetch(`/products/${id}/check`, { method: 'POST' });
+            fetchProducts();
+        }
+
+        fetchProducts();
+    </script>
+</body>
+</html>
