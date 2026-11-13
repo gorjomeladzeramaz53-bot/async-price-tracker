@@ -191,4 +191,3 @@ async def send_price_alert(product_name, current_price, target_price, url):
 from telegram.ext import CommandHandler
 
 # აი აქ, ბოლოში მიამატე:
-application.add_handler(CommandHandler("check", check_command))
