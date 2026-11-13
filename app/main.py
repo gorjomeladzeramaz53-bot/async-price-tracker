@@ -1,17 +1,20 @@
 from datetime import datetime
 from typing import List
 from contextlib import asynccontextmanager
+import asyncio
+import os
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from telegram.ext import ApplicationBuilder, CommandHandler
 
 from app.database import get_db, AsyncSessionLocal, engine, Base
 from app import models, schemas
 from app.tracker import fetch_product_price
-from app.telegram import send_telegram_alert
+from app.telegram import send_telegram_alert, start_command, list_command, add_command, delete_command, check_command
 
 def should_send_alert(product: models.Product, new_price: float) -> bool:
     if not product.target_price or new_price > product.target_price:
@@ -52,6 +55,25 @@ async def check_all_products_background():
         except Exception as e:
             print(f"შეცდომა ფონური შემოწმებისას: {e}")
 
+async def start_telegram_bot():
+    token = os.getenv("TELEGRAM_TOKEN")
+    if not token:
+        print("შეცდომა: TELEGRAM_TOKEN ვერ მოიძებნა!")
+        return
+    
+    app = ApplicationBuilder().token(token).build()
+    
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("list", list_command))
+    app.add_handler(CommandHandler("add", add_command))
+    app.add_handler(CommandHandler("delete", delete_command))
+    app.add_handler(CommandHandler("check", check_command))
+    
+    print("🤖 Telegram ბოტი ავტომატურად გააქტიურდა FastAPI-სთან ერთად...")
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
@@ -62,9 +84,16 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     print("ფონური სქედულერი და მონაცემთა ბაზა წარმატებით გააქტიურდა!")
     
+    # ვუშვებთ ტელეგრამის ბოტს ფონურ თასქად
+    bot_task = asyncio.create_task(start_telegram_bot())
+    
     yield
     
     scheduler.shutdown()
+    try:
+        bot_task.cancel()
+    except Exception:
+        pass
 
 app = FastAPI(title="Async Price Tracker API", lifespan=lifespan)
 
