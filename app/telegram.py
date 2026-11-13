@@ -125,3 +125,67 @@ async def send_price_alert(product_name, current_price, target_price, url):
   await bot.send_message(
       chat_id=USER_CHAT_ID, text=message, parse_mode="Markdown"
   )
+  import os
+from app.scraper import check_product_price
+from telegram import Bot, Update
+from telegram.ext import ContextTypes
+
+# შენი ბოტის ტოკენი და ჩათის აიდი (თუ უკვე გაქვს სხვაგან გაწერილი, შეგიძლია შენი დატოვო)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+
+# ფუნქცია, რომელიც ამოწმებს და აახლებს ფასებს
+async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+  chat_id = update.effective_chat.id
+
+  async with AsyncSessionLocal() as db:
+    result = await db.execute(select(Product))
+    products = result.scalars().all()
+
+    if not products:
+      await update.message.reply_text("📦 შენს სიაში ჯერ პროდუქტები არ არის.")
+      return
+
+    await update.message.reply_text(
+        "🔍 ვამოწმებ პროდუქტების ფასებს საიტებზე, გთხოვთ დაიცადოთ..."
+    )
+
+    checked_count = 0
+    for product in products:
+      if "example.com" not in product.url:
+        new_price = await check_product_price(product.url)
+
+        if new_price is not None:
+          product.price = new_price
+          await db.commit()
+          checked_count += 1
+
+          if new_price <= product.target_price:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=(
+                    f"🔔 **ფასის ვარდნის ალერტი!**\n\n📦 პროდუქტი:"
+                    f" **{product.title}**\n💰 მიმდინარე ფასი:"
+                    f" **{new_price}₾** (შენი მიზანი: {product.target_price}₾)\n🔗"
+                    f" [ლინკი პროდუქტზე]({product.url})"
+                ),
+                parse_mode="Markdown",
+            )
+
+    await update.message.reply_text(
+        f"✅ შემოწმდა და განახლდა {checked_count} პროდუქტი!"
+    )
+
+
+async def send_price_alert(product_name, current_price, target_price, url):
+  bot = Bot(token=TELEGRAM_BOT_TOKEN)
+  message = (
+      f"🔔 **ფასი დაეცა!**\n\n"
+      f"📦 პროდუქტი: **{product_name}**\n"
+      f"💰 მიმდინარე ფასი: **{current_price}₾** (შენი მიზანი: {target_price}₾)\n"
+      f"🔗 [ლინკი პროდუქტზე]({url})"
+  )
+  # გაითვალისწინე: აქ USER_CHAT_ID უნდა გქონდეს განსაზღვრული ან ბაზიდან ამოღებული
+  # await bot.send_message(chat_id=USER_CHAT_ID, text=message, parse_mode="Markdown")
+  pass
+application.add_handler(CommandHandler("check", check_command))
