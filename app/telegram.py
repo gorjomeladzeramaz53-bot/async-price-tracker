@@ -188,4 +188,3 @@ async def send_price_alert(product_name, current_price, target_price, url):
   # გაითვალისწინე: აქ USER_CHAT_ID უნდა გქონდეს განსაზღვრული ან ბაზიდან ამოღებული
   # await bot.send_message(chat_id=USER_CHAT_ID, text=message, parse_mode="Markdown")
   pass
-application.add_handler(CommandHandler("check", check_command))
