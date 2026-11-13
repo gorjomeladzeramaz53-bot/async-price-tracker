@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 # სერვერის მისამართი: თუ გარემო ცვლადი არსებობს, აიღებს მას, თუ არა - Localhost-ს
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
+API_URL = "https://async-price-tracker.onrender.com"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
