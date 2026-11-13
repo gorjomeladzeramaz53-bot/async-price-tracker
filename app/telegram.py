@@ -106,3 +106,22 @@ async def send_telegram_alert(chat_id: str, message: str):
             await client.post(url, json={"chat_id": chat_id, "text": message, "parse_mode": "Markdown"})
         except Exception as e:
             print(f"შეტყობინების გაგზავნის შეცდომა: {e}")
+
+            import os
+from telegram import Bot
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+USER_CHAT_ID = "შენი_ტელეგრამის_ჩათის_აიდი"  # ან ბაზიდან ამოღებული ჩატი
+
+
+async def send_price_alert(product_name, current_price, target_price, url):
+  bot = Bot(token=TELEGRAM_BOT_TOKEN)
+  message = (
+      f"🔔 **ფასი დაეცა!**\n\n"
+      f"📦 პროდუქტი: **{product_name}**\n"
+      f"💰 მიმდინარე ფასი: **{current_price}₾** (შენი მიზანი: {target_price}₾)\n"
+      f"🔗 [ლინკი პროდუქტზე]({url})"
+  )
+  await bot.send_message(
+      chat_id=USER_CHAT_ID, text=message, parse_mode="Markdown"
+  )

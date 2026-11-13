@@ -167,3 +167,30 @@ async def get_product_history(product_id: int, db: AsyncSession = Depends(get_db
         .order_by(models.PriceHistory.timestamp.desc())
     )
     return result.scalars().all()
+
+from app.scraper import check_product_price
+# დავუშვათ გვაქვს SQLAlchemy სესია და Product მოდელი
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
+router = APIRouter()
+
+
+@router.post("/check-prices/")
+async def trigger_price_check(db: AsyncSession = Depends(get_db)):
+  products = await db.execute(select(Product))
+  products = products.scalars().all()
+
+  updates = []
+  for product in products:
+    # ვამოწმებთ მხოლოდ იმ პროდუქტებს, რომლებსაც რეალური ლინკი აქვთ (არ არის example.com)
+    if "example.com" not in product.url:
+      new_price = await check_product_price(product.url)
+      if new_price is not None:
+        product.price = new_price
+        # აქ შეგიძლია შეამოწმო: თუ new_price <= product.target_price,
+        # მზადდება შეტყობინება ტელეგრამისთის!
+        updates.append({"id": product.id, "title": product.title, "price": new_price})
+
+  await db.commit()
+  return {"status": "success", "updated_count": len(updates), "updates": updates}
